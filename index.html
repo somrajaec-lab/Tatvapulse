@@ -1,0 +1,814 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TatvaPulse — Tatvacare Ops Hub</title>
+<style>
+  :root {
+    --primary: #6C5CE7;
+    --primary-dark: #5A4BD1;
+    --primary-light: #A29BFE;
+    --accent: #00CEC9;
+    --accent-dark: #00B5B0;
+    --bg: #0F0E17;
+    --bg-card: #1A1928;
+    --bg-input: #232136;
+    --text: #FFFFFE;
+    --text-muted: #94A1B2;
+    --danger: #FF6B6B;
+    --warning: #FDCB6E;
+    --success: #00B894;
+    --border: #2D2B45;
+    --shadow: 0 8px 32px rgba(0,0,0,.35);
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--text); min-height:100vh; }
+
+  /* ── AUTH SCREENS ── */
+  .auth-wrapper { display:flex; align-items:center; justify-content:center; min-height:100vh; background: linear-gradient(135deg, #0F0E17 0%, #1A1928 50%, #0F0E17 100%); }
+  .auth-box { background: var(--bg-card); border:1px solid var(--border); border-radius:20px; padding:48px 40px; width:440px; max-width:92vw; box-shadow: var(--shadow); text-align:center; }
+  .auth-box .logo { font-size:38px; font-weight:800; background: linear-gradient(135deg, var(--primary), var(--accent)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; margin-bottom:4px; }
+  .auth-box .tagline { color:var(--text-muted); font-size:13px; margin-bottom:32px; letter-spacing:.5px; }
+  .auth-box h2 { font-size:20px; margin-bottom:24px; color:var(--text); }
+  .auth-box input { width:100%; padding:14px 16px; border:1px solid var(--border); border-radius:10px; background:var(--bg-input); color:var(--text); font-size:15px; margin-bottom:14px; outline:none; transition:.2s; }
+  .auth-box input:focus { border-color:var(--primary); box-shadow:0 0 0 3px rgba(108,92,231,.2); }
+  .auth-box input::placeholder { color:#555; }
+  .auth-box .btn-primary { width:100%; padding:14px; border:none; border-radius:10px; background:linear-gradient(135deg, var(--primary), var(--accent)); color:#fff; font-size:16px; font-weight:700; cursor:pointer; transition:.2s; margin-top:6px; }
+  .auth-box .btn-primary:hover { transform:translateY(-1px); box-shadow:0 6px 24px rgba(108,92,231,.35); }
+  .auth-box .msg { font-size:13px; margin-top:12px; min-height:18px; }
+  .auth-box .msg.error { color:var(--danger); }
+  .auth-box .msg.success { color:var(--success); }
+  .auth-box .switch-link { color:var(--text-muted); font-size:14px; margin-top:20px; }
+  .auth-box .switch-link a { color:var(--accent); cursor:pointer; text-decoration:none; font-weight:600; }
+  .auth-box .switch-link a:hover { text-decoration:underline; }
+
+  .password-rules { text-align:left; margin:0 0 16px 4px; font-size:12px; color:var(--text-muted); line-height:1.7; }
+  .password-rules .rule { display:flex; align-items:center; gap:6px; }
+  .password-rules .rule.pass { color:var(--success); }
+  .password-rules .rule.fail { color:var(--text-muted); }
+
+  .hidden { display:none !important; }
+
+  /* ── APP SHELL ── */
+  .app { display:none; }
+  .app.active { display:flex; flex-direction:column; min-height:100vh; }
+
+  /* Header */
+  .header { display:flex; align-items:center; justify-content:space-between; padding:16px 28px; background:var(--bg-card); border-bottom:1px solid var(--border); position:sticky; top:0; z-index:100; }
+  .header .brand { font-size:22px; font-weight:800; background:linear-gradient(135deg, var(--primary), var(--accent)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+  .header .user-info { display:flex; align-items:center; gap:12px; }
+  .header .avatar { width:36px; height:36px; border-radius:50%; background:var(--primary); display:flex; align-items:center; justify-content:center; font-weight:700; font-size:14px; }
+  .header .user-name { font-size:14px; color:var(--text-muted); }
+  .header .btn-logout { padding:8px 16px; border:1px solid var(--border); border-radius:8px; background:transparent; color:var(--text-muted); font-size:13px; cursor:pointer; transition:.2s; }
+  .header .btn-logout:hover { border-color:var(--danger); color:var(--danger); }
+
+  /* Stats Bar */
+  .stats-bar { display:grid; grid-template-columns:repeat(4,1fr); gap:16px; padding:24px 28px; }
+  .stat-card { background:var(--bg-card); border:1px solid var(--border); border-radius:14px; padding:20px; }
+  .stat-card .stat-label { font-size:12px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.8px; margin-bottom:8px; }
+  .stat-card .stat-value { font-size:28px; font-weight:800; }
+  .stat-card.total .stat-value { color:var(--primary-light); }
+  .stat-card.open .stat-value { color:var(--warning); }
+  .stat-card.progress .stat-value { color:var(--accent); }
+  .stat-card.done .stat-value { color:var(--success); }
+
+  /* Controls */
+  .controls { display:flex; align-items:center; gap:12px; padding:0 28px 20px; flex-wrap:wrap; }
+  .btn-new { padding:12px 24px; border:none; border-radius:10px; background:linear-gradient(135deg, var(--primary), var(--accent)); color:#fff; font-size:14px; font-weight:700; cursor:pointer; transition:.2s; display:flex; align-items:center; gap:8px; }
+  .btn-new:hover { transform:translateY(-1px); box-shadow:0 6px 20px rgba(108,92,231,.3); }
+  .btn-whatsapp { padding:12px 24px; border:none; border-radius:10px; background:#25D366; color:#fff; font-size:14px; font-weight:700; cursor:pointer; transition:.2s; display:flex; align-items:center; gap:8px; }
+  .btn-whatsapp:hover { background:#1DA851; transform:translateY(-1px); }
+  .filter-group { display:flex; align-items:center; gap:8px; margin-left:auto; }
+  .filter-group select { padding:10px 14px; border:1px solid var(--border); border-radius:8px; background:var(--bg-input); color:var(--text); font-size:13px; outline:none; }
+  .filter-group select:focus { border-color:var(--primary); }
+
+  /* Task Table */
+  .table-wrapper { padding:0 28px 28px; flex:1; }
+  .task-table { width:100%; border-collapse:separate; border-spacing:0; background:var(--bg-card); border:1px solid var(--border); border-radius:14px; overflow:hidden; }
+  .task-table thead th { padding:14px 16px; font-size:12px; text-transform:uppercase; letter-spacing:.8px; color:var(--text-muted); text-align:left; background:var(--bg-input); border-bottom:1px solid var(--border); }
+  .task-table tbody tr { transition:.15s; }
+  .task-table tbody tr:hover { background:rgba(108,92,231,.06); }
+  .task-table tbody td { padding:14px 16px; font-size:14px; border-bottom:1px solid var(--border); vertical-align:middle; }
+  .task-table tbody tr:last-child td { border-bottom:none; }
+
+  .priority-badge { padding:4px 10px; border-radius:6px; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; }
+  .priority-badge.high { background:rgba(255,107,107,.15); color:var(--danger); }
+  .priority-badge.medium { background:rgba(253,203,110,.15); color:var(--warning); }
+  .priority-badge.low { background:rgba(0,184,148,.15); color:var(--success); }
+
+  .status-badge { padding:5px 12px; border-radius:20px; font-size:12px; font-weight:600; }
+  .status-badge.open { background:rgba(253,203,110,.12); color:var(--warning); }
+  .status-badge.in-progress { background:rgba(0,206,201,.12); color:var(--accent); }
+  .status-badge.done { background:rgba(0,184,148,.12); color:var(--success); }
+  .status-badge.blocked { background:rgba(255,107,107,.12); color:var(--danger); }
+
+  .owner-chip { display:inline-flex; align-items:center; gap:6px; padding:4px 10px 4px 4px; background:var(--bg-input); border-radius:20px; font-size:13px; }
+  .owner-chip .mini-avatar { width:22px; height:22px; border-radius:50%; background:var(--primary); display:flex; align-items:center; justify-content:center; font-size:10px; font-weight:700; }
+
+  .action-btns { display:flex; gap:6px; }
+  .action-btns button { width:32px; height:32px; border:1px solid var(--border); border-radius:8px; background:transparent; color:var(--text-muted); cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:14px; transition:.15s; }
+  .action-btns button:hover { border-color:var(--primary); color:var(--primary); }
+  .action-btns button.delete:hover { border-color:var(--danger); color:var(--danger); }
+
+  .empty-state { text-align:center; padding:60px 20px; color:var(--text-muted); }
+  .empty-state .emoji { font-size:48px; margin-bottom:12px; }
+  .empty-state p { font-size:15px; }
+
+  /* ── MODAL ── */
+  .modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.6); z-index:200; align-items:center; justify-content:center; backdrop-filter:blur(4px); }
+  .modal-overlay.active { display:flex; }
+  .modal { background:var(--bg-card); border:1px solid var(--border); border-radius:18px; padding:32px; width:520px; max-width:94vw; max-height:90vh; overflow-y:auto; box-shadow: var(--shadow); }
+  .modal h2 { font-size:20px; margin-bottom:24px; }
+  .form-group { margin-bottom:18px; }
+  .form-group label { display:block; font-size:12px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.6px; margin-bottom:6px; }
+  .form-group input, .form-group select, .form-group textarea { width:100%; padding:12px 14px; border:1px solid var(--border); border-radius:10px; background:var(--bg-input); color:var(--text); font-size:14px; outline:none; font-family:inherit; transition:.2s; }
+  .form-group textarea { resize:vertical; min-height:80px; }
+  .form-group input:focus, .form-group select:focus, .form-group textarea:focus { border-color:var(--primary); }
+  .modal-actions { display:flex; gap:10px; justify-content:flex-end; margin-top:24px; }
+  .modal-actions .btn-cancel { padding:10px 20px; border:1px solid var(--border); border-radius:10px; background:transparent; color:var(--text-muted); cursor:pointer; font-size:14px; }
+  .modal-actions .btn-save { padding:10px 24px; border:none; border-radius:10px; background:linear-gradient(135deg, var(--primary), var(--accent)); color:#fff; font-size:14px; font-weight:700; cursor:pointer; }
+
+  .wa-preview { background:var(--bg-input); border-radius:10px; padding:16px; font-size:13px; line-height:1.7; white-space:pre-wrap; font-family:'Segoe UI', monospace; margin-bottom:16px; max-height:320px; overflow-y:auto; color:var(--text); }
+
+  /* Team count badge on register */
+  .team-count { display:inline-block; background:var(--bg-input); border:1px solid var(--border); border-radius:20px; padding:4px 14px; font-size:12px; color:var(--text-muted); margin-bottom:20px; }
+
+  @media(max-width:768px) {
+    .stats-bar { grid-template-columns:repeat(2,1fr); gap:10px; padding:16px; }
+    .controls { padding:0 16px 16px; }
+    .table-wrapper { padding:0 16px 16px; overflow-x:auto; }
+    .task-table { min-width:700px; }
+    .header { padding:14px 16px; }
+    .filter-group { margin-left:0; width:100%; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ═══ REGISTER SCREEN ═══ -->
+<div class="auth-wrapper" id="registerScreen">
+  <div class="auth-box">
+    <div class="logo">TatvaPulse</div>
+    <div class="tagline">Tatvacare Operations Command Center</div>
+    <h2>Create Your Account</h2>
+    <div class="team-count" id="teamCount"></div>
+    <input type="text" id="regFullName" placeholder="Full Name (e.g. Somraj Keshori)" autocomplete="off" />
+    <input type="text" id="regUsername" placeholder="Choose a username" autocomplete="off" />
+    <input type="password" id="regPassword" placeholder="Create password (min 6 chars)" />
+    <input type="password" id="regConfirm" placeholder="Confirm password" />
+    <div class="password-rules" id="pwRules">
+      <div class="rule" id="ruleLen">&#x2022; At least 6 characters</div>
+      <div class="rule" id="ruleMatch">&#x2022; Passwords match</div>
+    </div>
+    <button class="btn-primary" onclick="handleRegister()">Create Account</button>
+    <div class="msg" id="regMsg"></div>
+    <div class="switch-link">Already have an account? <a onclick="showLogin()">Sign In</a></div>
+  </div>
+</div>
+
+<!-- ═══ LOGIN SCREEN ═══ -->
+<div class="auth-wrapper hidden" id="loginScreen">
+  <div class="auth-box">
+    <div class="logo">TatvaPulse</div>
+    <div class="tagline">Tatvacare Operations Command Center</div>
+    <h2>Welcome Back</h2>
+    <input type="text" id="loginUser" placeholder="Username" autocomplete="off" />
+    <input type="password" id="loginPass" placeholder="Password" />
+    <button class="btn-primary" onclick="handleLogin()">Sign In</button>
+    <div class="msg error" id="loginError"></div>
+    <div class="switch-link">New to TatvaPulse? <a onclick="showRegister()">Create Account</a></div>
+  </div>
+</div>
+
+<!-- ═══ MAIN APP ═══ -->
+<div class="app" id="mainApp">
+  <div class="header">
+    <div class="brand">TatvaPulse</div>
+    <div class="user-info">
+      <div>
+        <div class="user-name" id="headerUserName"></div>
+      </div>
+      <div class="avatar" id="headerAvatar"></div>
+      <button class="btn-logout" onclick="handleLogout()">Sign Out</button>
+    </div>
+  </div>
+
+  <div class="stats-bar">
+    <div class="stat-card total"><div class="stat-label">Total Tasks</div><div class="stat-value" id="statTotal">0</div></div>
+    <div class="stat-card open"><div class="stat-label">Open</div><div class="stat-value" id="statOpen">0</div></div>
+    <div class="stat-card progress"><div class="stat-label">In Progress</div><div class="stat-value" id="statProgress">0</div></div>
+    <div class="stat-card done"><div class="stat-label">Completed</div><div class="stat-value" id="statDone">0</div></div>
+  </div>
+
+  <div class="controls">
+    <button class="btn-new" onclick="openModal()">
+      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+      New Task
+    </button>
+    <button class="btn-whatsapp" onclick="openWhatsAppModal()">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347zM12.05 21.785h-.01a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.981.998-3.648-.235-.374A9.86 9.86 0 012.15 12.009c.002-5.45 4.437-9.884 9.889-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884zm0-21.67C5.495.116.112 5.497.11 12.01a11.81 11.81 0 001.587 5.926L0 24l6.233-1.635a11.85 11.85 0 005.81 1.523h.005c6.554 0 11.89-5.335 11.893-11.893A11.82 11.82 0 0020.525 3.49 11.81 11.81 0 0012.05.115z"/></svg>
+      Share on WhatsApp
+    </button>
+    <div class="filter-group">
+      <select id="filterStatus" onchange="renderTasks()">
+        <option value="all">All Status</option>
+        <option value="Open">Open</option>
+        <option value="In Progress">In Progress</option>
+        <option value="Done">Done</option>
+        <option value="Blocked">Blocked</option>
+      </select>
+      <select id="filterOwner" onchange="renderTasks()">
+        <option value="all">All Owners</option>
+      </select>
+      <select id="filterPriority" onchange="renderTasks()">
+        <option value="all">All Priority</option>
+        <option value="High">High</option>
+        <option value="Medium">Medium</option>
+        <option value="Low">Low</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="table-wrapper">
+    <table class="task-table">
+      <thead>
+        <tr>
+          <th style="width:30%">Task</th>
+          <th>Owner</th>
+          <th>Priority</th>
+          <th>Status</th>
+          <th>Due Date</th>
+          <th>Created</th>
+          <th style="width:90px">Actions</th>
+        </tr>
+      </thead>
+      <tbody id="taskTableBody"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ═══ TASK MODAL ═══ -->
+<div class="modal-overlay" id="taskModal">
+  <div class="modal">
+    <h2 id="modalTitle">New Task</h2>
+    <div class="form-group">
+      <label>Task Title *</label>
+      <input type="text" id="taskTitle" placeholder="What needs to be done?" />
+    </div>
+    <div class="form-group">
+      <label>Description</label>
+      <textarea id="taskDesc" placeholder="Add details, context, links..."></textarea>
+    </div>
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px;">
+      <div class="form-group">
+        <label>Assign Owner *</label>
+        <select id="taskOwner"></select>
+      </div>
+      <div class="form-group">
+        <label>Priority</label>
+        <select id="taskPriority">
+          <option value="High">High</option>
+          <option value="Medium" selected>Medium</option>
+          <option value="Low">Low</option>
+        </select>
+      </div>
+    </div>
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px;">
+      <div class="form-group">
+        <label>Status</label>
+        <select id="taskStatus">
+          <option value="Open">Open</option>
+          <option value="In Progress">In Progress</option>
+          <option value="Done">Done</option>
+          <option value="Blocked">Blocked</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Due Date</label>
+        <input type="date" id="taskDue" />
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModal()">Cancel</button>
+      <button class="btn-save" onclick="saveTask()">Save Task</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ WHATSAPP MODAL ═══ -->
+<div class="modal-overlay" id="waModal">
+  <div class="modal">
+    <h2>Share Snapshot via WhatsApp</h2>
+    <div class="form-group">
+      <label>Include Tasks</label>
+      <select id="waFilter">
+        <option value="all">All Tasks</option>
+        <option value="Open">Open Only</option>
+        <option value="In Progress">In Progress Only</option>
+        <option value="Blocked">Blocked Only</option>
+        <option value="mine">My Tasks Only</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Preview</label>
+      <div class="wa-preview" id="waPreview"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeWAModal()">Cancel</button>
+      <button class="btn-save" style="background:#25D366;" onclick="copySnapshot()">Copy Text</button>
+      <button class="btn-save" style="background:#25D366;" onclick="sendWhatsApp()">Send via WhatsApp</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════
+// DATA HELPERS
+// ═══════════════════════════════════════
+
+function getUsers() {
+  return JSON.parse(localStorage.getItem('tatvapulse_users') || '[]');
+}
+function saveUsers(users) {
+  localStorage.setItem('tatvapulse_users', JSON.stringify(users));
+}
+function getTasks() {
+  return JSON.parse(localStorage.getItem('tatvapulse_tasks') || '[]');
+}
+function saveTasks(tasks) {
+  localStorage.setItem('tatvapulse_tasks', JSON.stringify(tasks));
+}
+
+let currentUser = null;
+let editingTaskId = null;
+
+// ═══════════════════════════════════════
+// SCREEN NAVIGATION
+// ═══════════════════════════════════════
+
+function showRegister() {
+  document.getElementById('registerScreen').classList.remove('hidden');
+  document.getElementById('loginScreen').classList.add('hidden');
+  document.getElementById('mainApp').classList.remove('active');
+  clearRegForm();
+  updateTeamCount();
+}
+
+function showLogin() {
+  document.getElementById('registerScreen').classList.add('hidden');
+  document.getElementById('loginScreen').classList.remove('hidden');
+  document.getElementById('mainApp').classList.remove('active');
+  clearLoginForm();
+}
+
+function showApp() {
+  document.getElementById('registerScreen').classList.add('hidden');
+  document.getElementById('loginScreen').classList.add('hidden');
+  document.getElementById('mainApp').classList.add('active');
+  document.getElementById('headerUserName').textContent = currentUser.name;
+  document.getElementById('headerAvatar').textContent = currentUser.name.split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase();
+  populateOwnerDropdowns();
+  renderTasks();
+}
+
+function clearRegForm() {
+  document.getElementById('regFullName').value = '';
+  document.getElementById('regUsername').value = '';
+  document.getElementById('regPassword').value = '';
+  document.getElementById('regConfirm').value = '';
+  document.getElementById('regMsg').textContent = '';
+  document.getElementById('regMsg').className = 'msg';
+}
+
+function clearLoginForm() {
+  document.getElementById('loginUser').value = '';
+  document.getElementById('loginPass').value = '';
+  document.getElementById('loginError').textContent = '';
+}
+
+function updateTeamCount() {
+  const count = getUsers().length;
+  const el = document.getElementById('teamCount');
+  if (count === 0) {
+    el.textContent = 'Be the first to join the team!';
+  } else {
+    el.textContent = `${count} team member${count > 1 ? 's' : ''} registered`;
+  }
+}
+
+// ═══════════════════════════════════════
+// REGISTRATION
+// ═══════════════════════════════════════
+
+// Live password validation
+document.getElementById('regPassword').addEventListener('input', validatePasswordLive);
+document.getElementById('regConfirm').addEventListener('input', validatePasswordLive);
+
+function validatePasswordLive() {
+  const pw = document.getElementById('regPassword').value;
+  const cf = document.getElementById('regConfirm').value;
+
+  const lenOk = pw.length >= 6;
+  const matchOk = pw.length > 0 && cf.length > 0 && pw === cf;
+
+  const ruleLen = document.getElementById('ruleLen');
+  const ruleMatch = document.getElementById('ruleMatch');
+
+  ruleLen.className = lenOk ? 'rule pass' : 'rule fail';
+  ruleLen.innerHTML = (lenOk ? '&#x2713;' : '&#x2022;') + ' At least 6 characters';
+
+  ruleMatch.className = matchOk ? 'rule pass' : 'rule fail';
+  ruleMatch.innerHTML = (matchOk ? '&#x2713;' : '&#x2022;') + ' Passwords match';
+}
+
+function handleRegister() {
+  const fullName = document.getElementById('regFullName').value.trim();
+  const username = document.getElementById('regUsername').value.trim().toLowerCase();
+  const password = document.getElementById('regPassword').value;
+  const confirm = document.getElementById('regConfirm').value;
+  const msgEl = document.getElementById('regMsg');
+
+  // Validation
+  if (!fullName) {
+    msgEl.className = 'msg error';
+    msgEl.textContent = 'Please enter your full name';
+    return;
+  }
+  if (!username || username.length < 3) {
+    msgEl.className = 'msg error';
+    msgEl.textContent = 'Username must be at least 3 characters';
+    return;
+  }
+  if (/[^a-z0-9._]/.test(username)) {
+    msgEl.className = 'msg error';
+    msgEl.textContent = 'Username can only contain letters, numbers, dots, underscores';
+    return;
+  }
+  if (password.length < 6) {
+    msgEl.className = 'msg error';
+    msgEl.textContent = 'Password must be at least 6 characters';
+    return;
+  }
+  if (password !== confirm) {
+    msgEl.className = 'msg error';
+    msgEl.textContent = 'Passwords do not match';
+    return;
+  }
+
+  const users = getUsers();
+  if (users.find(u => u.username === username)) {
+    msgEl.className = 'msg error';
+    msgEl.textContent = 'Username already taken. Try another one.';
+    return;
+  }
+
+  // Register
+  const newUser = {
+    id: 'U' + Date.now(),
+    username,
+    name: fullName,
+    password,               // In a real app, hash this server-side
+    role: users.length === 0 ? 'Admin' : 'Member',  // First user becomes Admin
+    registeredAt: new Date().toISOString()
+  };
+
+  users.push(newUser);
+  saveUsers(users);
+
+  msgEl.className = 'msg success';
+  msgEl.textContent = 'Account created! Redirecting to sign in...';
+
+  setTimeout(() => {
+    showLogin();
+    document.getElementById('loginUser').value = username;
+    document.getElementById('loginUser').focus();
+  }, 1200);
+}
+
+// Enter key handling on registration form
+document.getElementById('regFullName').addEventListener('keydown', e => { if(e.key==='Enter') document.getElementById('regUsername').focus(); });
+document.getElementById('regUsername').addEventListener('keydown', e => { if(e.key==='Enter') document.getElementById('regPassword').focus(); });
+document.getElementById('regPassword').addEventListener('keydown', e => { if(e.key==='Enter') document.getElementById('regConfirm').focus(); });
+document.getElementById('regConfirm').addEventListener('keydown', e => { if(e.key==='Enter') handleRegister(); });
+
+// ═══════════════════════════════════════
+// LOGIN
+// ═══════════════════════════════════════
+
+function handleLogin() {
+  const u = document.getElementById('loginUser').value.trim().toLowerCase();
+  const p = document.getElementById('loginPass').value;
+  const msgEl = document.getElementById('loginError');
+
+  if (!u || !p) {
+    msgEl.textContent = 'Please enter username and password';
+    return;
+  }
+
+  const users = getUsers();
+  const found = users.find(usr => usr.username === u && usr.password === p);
+
+  if (found) {
+    currentUser = { username: found.username, name: found.name, role: found.role, id: found.id };
+    localStorage.setItem('tatvapulse_session', JSON.stringify(currentUser));
+    showApp();
+  } else {
+    msgEl.textContent = 'Invalid username or password';
+    document.getElementById('loginPass').value = '';
+  }
+}
+
+document.getElementById('loginPass').addEventListener('keydown', e => { if(e.key==='Enter') handleLogin(); });
+document.getElementById('loginUser').addEventListener('keydown', e => { if(e.key==='Enter') document.getElementById('loginPass').focus(); });
+
+function handleLogout() {
+  currentUser = null;
+  localStorage.removeItem('tatvapulse_session');
+  showLogin();
+}
+
+// ═══════════════════════════════════════
+// AUTO-SESSION CHECK ON LOAD
+// ═══════════════════════════════════════
+
+(function init() {
+  const session = localStorage.getItem('tatvapulse_session');
+  const users = getUsers();
+
+  if (session) {
+    const s = JSON.parse(session);
+    // Verify user still exists
+    if (users.find(u => u.username === s.username)) {
+      currentUser = s;
+      showApp();
+      return;
+    }
+    localStorage.removeItem('tatvapulse_session');
+  }
+
+  // No session: show register if no users yet, otherwise show login
+  if (users.length === 0) {
+    showRegister();
+  } else {
+    showLogin();
+  }
+})();
+
+// ═══════════════════════════════════════
+// OWNER DROPDOWNS (from registered users)
+// ═══════════════════════════════════════
+
+function populateOwnerDropdowns() {
+  const users = getUsers();
+  const names = users.map(u => u.name);
+
+  // Task form owner select
+  const sel = document.getElementById('taskOwner');
+  sel.innerHTML = names.map(n => `<option value="${n}">${n}</option>`).join('');
+
+  // Filter owner select
+  const filt = document.getElementById('filterOwner');
+  filt.innerHTML = '<option value="all">All Owners</option>' + names.map(n => `<option value="${n}">${n}</option>`).join('');
+}
+
+// ═══════════════════════════════════════
+// RENDER TASKS
+// ═══════════════════════════════════════
+
+function renderTasks() {
+  let tasks = getTasks();
+  const fs = document.getElementById('filterStatus').value;
+  const fo = document.getElementById('filterOwner').value;
+  const fp = document.getElementById('filterPriority').value;
+
+  if (fs !== 'all') tasks = tasks.filter(t => t.status === fs);
+  if (fo !== 'all') tasks = tasks.filter(t => t.owner === fo);
+  if (fp !== 'all') tasks = tasks.filter(t => t.priority === fp);
+
+  const statusOrder = { 'Blocked':0, 'In Progress':1, 'Open':2, 'Done':3 };
+  const prioOrder = { 'High':0, 'Medium':1, 'Low':2 };
+  tasks.sort((a,b) => (statusOrder[a.status]??9) - (statusOrder[b.status]??9) || (prioOrder[a.priority]??9) - (prioOrder[b.priority]??9));
+
+  const tbody = document.getElementById('taskTableBody');
+
+  if (tasks.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="7"><div class="empty-state"><div class="emoji">📋</div><p>No tasks yet. Click "New Task" to get started!</p></div></td></tr>`;
+  } else {
+    tbody.innerHTML = tasks.map(t => {
+      const prioClass = t.priority.toLowerCase();
+      const statusClass = t.status.toLowerCase().replace(' ','-');
+      const initials = t.owner.split(' ').map(w=>w[0]).join('').substring(0,2);
+      const due = t.dueDate ? new Date(t.dueDate).toLocaleDateString('en-IN', {day:'numeric',month:'short'}) : '—';
+      const created = new Date(t.createdAt).toLocaleDateString('en-IN', {day:'numeric',month:'short'});
+      return `<tr>
+        <td>
+          <div style="font-weight:600;margin-bottom:2px">${esc(t.title)}</div>
+          ${t.description ? `<div style="font-size:12px;color:var(--text-muted);max-width:300px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(t.description)}</div>` : ''}
+        </td>
+        <td><span class="owner-chip"><span class="mini-avatar">${initials}</span>${esc(t.owner)}</span></td>
+        <td><span class="priority-badge ${prioClass}">${t.priority}</span></td>
+        <td><span class="status-badge ${statusClass}">${t.status}</span></td>
+        <td>${due}</td>
+        <td>${created}</td>
+        <td>
+          <div class="action-btns">
+            <button title="Edit" onclick="editTask('${t.id}')">✏️</button>
+            <button title="Delete" class="delete" onclick="deleteTask('${t.id}')">🗑️</button>
+          </div>
+        </td>
+      </tr>`;
+    }).join('');
+  }
+
+  updateStats();
+}
+
+function updateStats() {
+  const tasks = getTasks();
+  document.getElementById('statTotal').textContent = tasks.length;
+  document.getElementById('statOpen').textContent = tasks.filter(t=>t.status==='Open').length;
+  document.getElementById('statProgress').textContent = tasks.filter(t=>t.status==='In Progress').length;
+  document.getElementById('statDone').textContent = tasks.filter(t=>t.status==='Done').length;
+}
+
+function esc(s) { const d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
+
+// ═══════════════════════════════════════
+// TASK CRUD
+// ═══════════════════════════════════════
+
+function openModal(taskId) {
+  editingTaskId = taskId || null;
+  document.getElementById('modalTitle').textContent = taskId ? 'Edit Task' : 'New Task';
+  if (taskId) {
+    const t = getTasks().find(t=>t.id===taskId);
+    if(t) {
+      document.getElementById('taskTitle').value = t.title;
+      document.getElementById('taskDesc').value = t.description||'';
+      document.getElementById('taskOwner').value = t.owner;
+      document.getElementById('taskPriority').value = t.priority;
+      document.getElementById('taskStatus').value = t.status;
+      document.getElementById('taskDue').value = t.dueDate||'';
+    }
+  } else {
+    document.getElementById('taskTitle').value = '';
+    document.getElementById('taskDesc').value = '';
+    document.getElementById('taskPriority').value = 'Medium';
+    document.getElementById('taskStatus').value = 'Open';
+    document.getElementById('taskDue').value = '';
+  }
+  document.getElementById('taskModal').classList.add('active');
+  setTimeout(()=> document.getElementById('taskTitle').focus(), 100);
+}
+
+function closeModal() {
+  document.getElementById('taskModal').classList.remove('active');
+  editingTaskId = null;
+}
+
+function saveTask() {
+  const title = document.getElementById('taskTitle').value.trim();
+  const owner = document.getElementById('taskOwner').value;
+  if (!title) { alert('Please enter a task title'); return; }
+
+  const tasks = getTasks();
+  const taskData = {
+    title,
+    description: document.getElementById('taskDesc').value.trim(),
+    owner,
+    priority: document.getElementById('taskPriority').value,
+    status: document.getElementById('taskStatus').value,
+    dueDate: document.getElementById('taskDue').value,
+  };
+
+  if (editingTaskId) {
+    const idx = tasks.findIndex(t=>t.id===editingTaskId);
+    if (idx>=0) { tasks[idx] = { ...tasks[idx], ...taskData, updatedAt: new Date().toISOString() }; }
+  } else {
+    tasks.push({
+      id: 'T' + Date.now(),
+      ...taskData,
+      createdBy: currentUser.name,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+  }
+
+  saveTasks(tasks);
+  closeModal();
+  renderTasks();
+}
+
+function editTask(id) { openModal(id); }
+
+function deleteTask(id) {
+  if (!confirm('Delete this task?')) return;
+  const tasks = getTasks().filter(t=>t.id!==id);
+  saveTasks(tasks);
+  renderTasks();
+}
+
+// ═══════════════════════════════════════
+// WHATSAPP SHARING
+// ═══════════════════════════════════════
+
+function openWhatsAppModal() {
+  document.getElementById('waModal').classList.add('active');
+  document.getElementById('waFilter').value = 'all';
+  updateWAPreview();
+}
+
+function closeWAModal() {
+  document.getElementById('waModal').classList.remove('active');
+}
+
+document.getElementById('waFilter').addEventListener('change', updateWAPreview);
+
+function updateWAPreview() {
+  document.getElementById('waPreview').textContent = generateSnapshot();
+}
+
+function generateSnapshot() {
+  let tasks = getTasks();
+  const filter = document.getElementById('waFilter').value;
+
+  if (filter === 'mine') tasks = tasks.filter(t => t.owner === currentUser.name);
+  else if (filter !== 'all') tasks = tasks.filter(t => t.status === filter);
+
+  const statusOrder = { 'Blocked':0, 'In Progress':1, 'Open':2, 'Done':3 };
+  tasks.sort((a,b) => (statusOrder[a.status]??9) - (statusOrder[b.status]??9));
+
+  const now = new Date().toLocaleDateString('en-IN', { day:'numeric', month:'short', year:'numeric' });
+  const statusIcon = { 'Open':'🔵', 'In Progress':'🟡', 'Done':'✅', 'Blocked':'🔴' };
+  const prioIcon = { 'High':'🔥', 'Medium':'➖', 'Low':'🟢' };
+
+  let msg = `━━━━━━━━━━━━━━━━━━━━\n`;
+  msg += `📊 *TatvaPulse — Action Items*\n`;
+  msg += `📅 ${now}\n`;
+  msg += `━━━━━━━━━━━━━━━━━━━━\n\n`;
+
+  if (tasks.length === 0) {
+    msg += `No tasks to show.\n`;
+  } else {
+    const grouped = {};
+    tasks.forEach(t => {
+      if (!grouped[t.status]) grouped[t.status] = [];
+      grouped[t.status].push(t);
+    });
+
+    for (const status of ['Blocked','In Progress','Open','Done']) {
+      if (!grouped[status]) continue;
+      msg += `${statusIcon[status]} *${status.toUpperCase()}* (${grouped[status].length})\n`;
+      grouped[status].forEach((t, i) => {
+        const due = t.dueDate ? ` | Due: ${new Date(t.dueDate).toLocaleDateString('en-IN',{day:'numeric',month:'short'})}` : '';
+        msg += `  ${i+1}. ${t.title}\n`;
+        msg += `     👤 ${t.owner} ${prioIcon[t.priority]}${due}\n`;
+      });
+      msg += `\n`;
+    }
+  }
+
+  const total = getTasks();
+  msg += `━━━━━━━━━━━━━━━━━━━━\n`;
+  msg += `📈 *Summary:* ${total.length} total | ${total.filter(t=>t.status==='Open').length} open | ${total.filter(t=>t.status==='In Progress').length} in progress | ${total.filter(t=>t.status==='Done').length} done | ${total.filter(t=>t.status==='Blocked').length} blocked\n`;
+  msg += `━━━━━━━━━━━━━━━━━━━━\n`;
+  msg += `Sent from TatvaPulse`;
+
+  return msg;
+}
+
+function copySnapshot() {
+  const text = generateSnapshot();
+  navigator.clipboard.writeText(text).then(() => {
+    alert('Snapshot copied to clipboard! Paste it in WhatsApp.');
+  }).catch(() => {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    alert('Snapshot copied! Paste it in WhatsApp.');
+  });
+}
+
+function sendWhatsApp() {
+  const text = encodeURIComponent(generateSnapshot());
+  window.open(`https://wa.me/?text=${text}`, '_blank');
+}
+
+// Close modals on overlay click
+document.getElementById('taskModal').addEventListener('click', e => { if(e.target===e.currentTarget) closeModal(); });
+document.getElementById('waModal').addEventListener('click', e => { if(e.target===e.currentTarget) closeWAModal(); });
+
+// Keyboard shortcuts
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') { closeModal(); closeWAModal(); }
+  if (e.key === 'n' && !e.ctrlKey && !e.metaKey && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA' && document.activeElement.tagName !== 'SELECT') {
+    if (currentUser) openModal();
+  }
+});
+</script>
+</body>
+</html>
