@@ -349,7 +349,6 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 
 <script>
-(function() {
 // ═══════════════════════════════════════
 // SUPABASE CONFIG
 // ═══════════════════════════════════════
@@ -371,7 +370,7 @@ if (!window.supabase) {
   console.error('Supabase library failed to load');
   setTimeout(() => showLogin(), 500);
 }
-const supabase = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
+const db = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
 
 // ═══════════════════════════════════════
 // STATE
@@ -434,7 +433,7 @@ function clearLoginForm() {
 
 async function updateTeamCount() {
   try {
-    const { count, error } = await supabase.from('users').select('*', { count: 'exact', head: true });
+    const { count, error } = await db.from('users').select('*', { count: 'exact', head: true });
     const el = document.getElementById('teamCount');
     const c = count || 0;
     el.textContent = c === 0 ? 'Be the first to join the team!' : `${c} team member${c > 1 ? 's' : ''} registered`;
@@ -449,11 +448,11 @@ async function updateTeamCount() {
 
 async function loadAllData() {
   try {
-    const { data: users } = await supabase.from('users').select('*').order('registered_at', { ascending: true });
+    const { data: users } = await db.from('users').select('*').order('registered_at', { ascending: true });
     allUsers = users || [];
     populateOwnerDropdowns();
 
-    const { data: tasks } = await supabase.from('tasks').select('*').order('created_at', { ascending: false });
+    const { data: tasks } = await db.from('tasks').select('*').order('created_at', { ascending: false });
     allTasks = (tasks || []).map(normalizeTask);
     renderTasks();
     document.getElementById('syncDot').classList.remove('offline');
@@ -481,8 +480,8 @@ function normalizeTask(t) {
 
 function startRealtimeListeners() {
   // Listen to tasks table changes in real-time
-  if (taskChannel) supabase.removeChannel(taskChannel);
-  taskChannel = supabase.channel('tasks-changes')
+  if (taskChannel) db.removeChannel(taskChannel);
+  taskChannel = db.channel('tasks-changes')
     .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, () => {
       loadAllData(); // Reload on any change
     })
@@ -493,8 +492,8 @@ function startRealtimeListeners() {
     });
 
   // Listen to users table for new registrations
-  if (userChannel) supabase.removeChannel(userChannel);
-  userChannel = supabase.channel('users-changes')
+  if (userChannel) db.removeChannel(userChannel);
+  userChannel = db.channel('users-changes')
     .on('postgres_changes', { event: '*', schema: 'public', table: 'users' }, () => {
       loadAllData();
     })
@@ -502,8 +501,8 @@ function startRealtimeListeners() {
 }
 
 function stopListeners() {
-  if (taskChannel) { supabase.removeChannel(taskChannel); taskChannel = null; }
-  if (userChannel) { supabase.removeChannel(userChannel); userChannel = null; }
+  if (taskChannel) { db.removeChannel(taskChannel); taskChannel = null; }
+  if (userChannel) { db.removeChannel(userChannel); userChannel = null; }
 }
 
 // ═══════════════════════════════════════
@@ -545,7 +544,7 @@ async function handleRegister() {
 
   try {
     // Check if username exists
-    const { data: existing } = await supabase.from('users').select('id').eq('username', username);
+    const { data: existing } = await db.from('users').select('id').eq('username', username);
     if (existing && existing.length > 0) {
       msgEl.className = 'msg error';
       msgEl.textContent = 'Username already taken. Try another one.';
@@ -555,10 +554,10 @@ async function handleRegister() {
     }
 
     // Check if first user (becomes Admin)
-    const { count } = await supabase.from('users').select('*', { count: 'exact', head: true });
+    const { count } = await db.from('users').select('*', { count: 'exact', head: true });
     const role = (count || 0) === 0 ? 'Admin' : 'Member';
 
-    const { error } = await supabase.from('users').insert({
+    const { error } = await db.from('users').insert({
       username,
       name: fullName,
       password,
@@ -607,7 +606,7 @@ async function handleLogin() {
   btn.textContent = 'Signing in...';
 
   try {
-    const { data, error } = await supabase.from('users').select('*').eq('username', u).single();
+    const { data, error } = await db.from('users').select('*').eq('username', u).single();
     if (error || !data) {
       msgEl.textContent = 'Invalid username or password';
       document.getElementById('loginPass').value = '';
@@ -658,7 +657,7 @@ function withTimeout(promise, ms = 8000) {
     try {
       const s = JSON.parse(session);
       const { data } = await withTimeout(
-        supabase.from('users').select('id').eq('username', s.username).single()
+        db.from('users').select('id').eq('username', s.username).single()
       );
       if (data) {
         currentUser = s;
@@ -674,7 +673,7 @@ function withTimeout(promise, ms = 8000) {
   // No valid session — check if any users exist
   try {
     const { count } = await withTimeout(
-      supabase.from('users').select('*', { count: 'exact', head: true })
+      db.from('users').select('*', { count: 'exact', head: true })
     );
     if ((count || 0) === 0) {
       showRegister();
@@ -812,12 +811,12 @@ async function saveTask() {
 
   try {
     if (editingTaskId) {
-      const { error } = await supabase.from('tasks').update(taskData).eq('id', editingTaskId);
+      const { error } = await db.from('tasks').update(taskData).eq('id', editingTaskId);
       if (error) throw error;
     } else {
       taskData.created_by = currentUser.name;
       taskData.created_at = new Date().toISOString();
-      const { error } = await supabase.from('tasks').insert(taskData);
+      const { error } = await db.from('tasks').insert(taskData);
       if (error) throw error;
     }
     closeModal();
@@ -833,7 +832,7 @@ function editTask(id) { openModal(id); }
 async function deleteTask(id) {
   if (!confirm('Delete this task?')) return;
   try {
-    const { error } = await supabase.from('tasks').delete().eq('id', id);
+    const { error } = await db.from('tasks').delete().eq('id', id);
     if (error) throw error;
     await loadAllData();
   } catch(e) {
@@ -996,7 +995,6 @@ document.addEventListener('keydown', e => {
     if (currentUser) openModal();
   }
 });
-})(); // end IIFE scope
 </script>
 </body>
 </html>
