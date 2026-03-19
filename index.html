@@ -25,8 +25,14 @@
   * { margin:0; padding:0; box-sizing:border-box; }
   body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--text); min-height:100vh; }
 
+  /* ── LOADING ── */
+  .loading-screen { display:flex; align-items:center; justify-content:center; min-height:100vh; background:var(--bg); }
+  .loading-screen .spinner { width:40px; height:40px; border:3px solid var(--border); border-top-color:var(--accent); border-radius:50%; animation:spin .8s linear infinite; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+
   /* ── AUTH SCREENS ── */
-  .auth-wrapper { display:flex; align-items:center; justify-content:center; min-height:100vh; background: linear-gradient(135deg, #0F0E17 0%, #1A1928 50%, #0F0E17 100%); }
+  .auth-wrapper { display:none; align-items:center; justify-content:center; min-height:100vh; background: linear-gradient(135deg, #0F0E17 0%, #1A1928 50%, #0F0E17 100%); }
+  .auth-wrapper.visible { display:flex; }
   .auth-box { background: var(--bg-card); border:1px solid var(--border); border-radius:20px; padding:48px 40px; width:440px; max-width:92vw; box-shadow: var(--shadow); text-align:center; }
   .auth-box .logo { font-size:38px; font-weight:800; background: linear-gradient(135deg, var(--primary), var(--accent)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; margin-bottom:4px; }
   .auth-box .tagline { color:var(--text-muted); font-size:13px; margin-bottom:32px; letter-spacing:.5px; }
@@ -36,6 +42,7 @@
   .auth-box input::placeholder { color:#555; }
   .auth-box .btn-primary { width:100%; padding:14px; border:none; border-radius:10px; background:linear-gradient(135deg, var(--primary), var(--accent)); color:#fff; font-size:16px; font-weight:700; cursor:pointer; transition:.2s; margin-top:6px; }
   .auth-box .btn-primary:hover { transform:translateY(-1px); box-shadow:0 6px 24px rgba(108,92,231,.35); }
+  .auth-box .btn-primary:disabled { opacity:.5; cursor:not-allowed; transform:none; }
   .auth-box .msg { font-size:13px; margin-top:12px; min-height:18px; }
   .auth-box .msg.error { color:var(--danger); }
   .auth-box .msg.success { color:var(--success); }
@@ -53,6 +60,11 @@
   /* ── APP SHELL ── */
   .app { display:none; }
   .app.active { display:flex; flex-direction:column; min-height:100vh; }
+
+  /* Sync indicator */
+  .sync-dot { width:8px; height:8px; border-radius:50%; background:var(--success); display:inline-block; margin-right:6px; animation:pulse 2s infinite; }
+  .sync-dot.offline { background:var(--danger); animation:none; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
 
   /* Header */
   .header { display:flex; align-items:center; justify-content:space-between; padding:16px 28px; background:var(--bg-card); border-bottom:1px solid var(--border); position:sticky; top:0; z-index:100; }
@@ -133,7 +145,6 @@
 
   .wa-preview { background:var(--bg-input); border-radius:10px; padding:16px; font-size:13px; line-height:1.7; white-space:pre-wrap; font-family:'Segoe UI', monospace; margin-bottom:16px; max-height:320px; overflow-y:auto; color:var(--text); }
 
-  /* Team count badge on register */
   .team-count { display:inline-block; background:var(--bg-input); border:1px solid var(--border); border-radius:20px; padding:4px 14px; font-size:12px; color:var(--text-muted); margin-bottom:20px; }
 
   @media(max-width:768px) {
@@ -147,6 +158,11 @@
 </style>
 </head>
 <body>
+
+<!-- ═══ LOADING ═══ -->
+<div class="loading-screen" id="loadingScreen">
+  <div class="spinner"></div>
+</div>
 
 <!-- ═══ REGISTER SCREEN ═══ -->
 <div class="auth-wrapper" id="registerScreen">
@@ -163,21 +179,21 @@
       <div class="rule" id="ruleLen">&#x2022; At least 6 characters</div>
       <div class="rule" id="ruleMatch">&#x2022; Passwords match</div>
     </div>
-    <button class="btn-primary" onclick="handleRegister()">Create Account</button>
+    <button class="btn-primary" id="btnRegister" onclick="handleRegister()">Create Account</button>
     <div class="msg" id="regMsg"></div>
     <div class="switch-link">Already have an account? <a onclick="showLogin()">Sign In</a></div>
   </div>
 </div>
 
 <!-- ═══ LOGIN SCREEN ═══ -->
-<div class="auth-wrapper hidden" id="loginScreen">
+<div class="auth-wrapper" id="loginScreen">
   <div class="auth-box">
     <div class="logo">TatvaPulse</div>
     <div class="tagline">Tatvacare Operations Command Center</div>
     <h2>Welcome Back</h2>
     <input type="text" id="loginUser" placeholder="Username" autocomplete="off" />
     <input type="password" id="loginPass" placeholder="Password" />
-    <button class="btn-primary" onclick="handleLogin()">Sign In</button>
+    <button class="btn-primary" id="btnLogin" onclick="handleLogin()">Sign In</button>
     <div class="msg error" id="loginError"></div>
     <div class="switch-link">New to TatvaPulse? <a onclick="showRegister()">Create Account</a></div>
   </div>
@@ -186,7 +202,7 @@
 <!-- ═══ MAIN APP ═══ -->
 <div class="app" id="mainApp">
   <div class="header">
-    <div class="brand">TatvaPulse</div>
+    <div class="brand"><span class="sync-dot" id="syncDot" title="Live sync active"></span>TatvaPulse</div>
     <div class="user-info">
       <div>
         <div class="user-name" id="headerUserName"></div>
@@ -328,55 +344,63 @@
   </div>
 </div>
 
+<!-- ═══ EXTERNAL SCRIPTS ═══ -->
 <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+<script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+
 <script>
 // ═══════════════════════════════════════
-// DATA HELPERS
+// SUPABASE CONFIG
 // ═══════════════════════════════════════
+// ⚠️ REPLACE THESE TWO VALUES with your Supabase project credentials:
+//    Supabase Dashboard → Settings → API → Project URL & anon/public key
+const SUPABASE_URL = 'https://pqjoespbqhgncszkdmta.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBxam9lc3BicWhnbmNzemtkbXRhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM5MTI1NTIsImV4cCI6MjA4OTQ4ODU1Mn0.PO7mbDcVb9pw3hX2xi5HXzl9hOKmFQS08zG20gqM-CE';
 
-function getUsers() {
-  return JSON.parse(localStorage.getItem('tatvapulse_users') || '[]');
-}
-function saveUsers(users) {
-  localStorage.setItem('tatvapulse_users', JSON.stringify(users));
-}
-function getTasks() {
-  return JSON.parse(localStorage.getItem('tatvapulse_tasks') || '[]');
-}
-function saveTasks(tasks) {
-  localStorage.setItem('tatvapulse_tasks', JSON.stringify(tasks));
-}
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// ═══════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════
 
 let currentUser = null;
 let editingTaskId = null;
+let allUsers = [];
+let allTasks = [];
+let taskChannel = null;
+let userChannel = null;
 
 // ═══════════════════════════════════════
 // SCREEN NAVIGATION
 // ═══════════════════════════════════════
 
-function showRegister() {
-  document.getElementById('registerScreen').classList.remove('hidden');
-  document.getElementById('loginScreen').classList.add('hidden');
+function hideAllScreens() {
+  document.getElementById('loadingScreen').style.display = 'none';
+  document.getElementById('registerScreen').classList.remove('visible');
+  document.getElementById('loginScreen').classList.remove('visible');
   document.getElementById('mainApp').classList.remove('active');
+}
+
+function showRegister() {
+  hideAllScreens();
+  document.getElementById('registerScreen').classList.add('visible');
   clearRegForm();
   updateTeamCount();
 }
 
 function showLogin() {
-  document.getElementById('registerScreen').classList.add('hidden');
-  document.getElementById('loginScreen').classList.remove('hidden');
-  document.getElementById('mainApp').classList.remove('active');
+  hideAllScreens();
+  document.getElementById('loginScreen').classList.add('visible');
   clearLoginForm();
 }
 
 function showApp() {
-  document.getElementById('registerScreen').classList.add('hidden');
-  document.getElementById('loginScreen').classList.add('hidden');
+  hideAllScreens();
   document.getElementById('mainApp').classList.add('active');
   document.getElementById('headerUserName').textContent = currentUser.name;
   document.getElementById('headerAvatar').textContent = currentUser.name.split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase();
-  populateOwnerDropdowns();
-  renderTasks();
+  loadAllData();
+  startRealtimeListeners();
 }
 
 function clearRegForm() {
@@ -394,106 +418,160 @@ function clearLoginForm() {
   document.getElementById('loginError').textContent = '';
 }
 
-function updateTeamCount() {
-  const count = getUsers().length;
-  const el = document.getElementById('teamCount');
-  if (count === 0) {
-    el.textContent = 'Be the first to join the team!';
-  } else {
-    el.textContent = `${count} team member${count > 1 ? 's' : ''} registered`;
+async function updateTeamCount() {
+  try {
+    const { count, error } = await supabase.from('users').select('*', { count: 'exact', head: true });
+    const el = document.getElementById('teamCount');
+    const c = count || 0;
+    el.textContent = c === 0 ? 'Be the first to join the team!' : `${c} team member${c > 1 ? 's' : ''} registered`;
+  } catch(e) {
+    document.getElementById('teamCount').textContent = '';
   }
+}
+
+// ═══════════════════════════════════════
+// DATA LOADING & REAL-TIME
+// ═══════════════════════════════════════
+
+async function loadAllData() {
+  try {
+    const { data: users } = await supabase.from('users').select('*').order('registered_at', { ascending: true });
+    allUsers = users || [];
+    populateOwnerDropdowns();
+
+    const { data: tasks } = await supabase.from('tasks').select('*').order('created_at', { ascending: false });
+    allTasks = (tasks || []).map(normalizeTask);
+    renderTasks();
+    document.getElementById('syncDot').classList.remove('offline');
+  } catch(e) {
+    console.error('Load error:', e);
+    document.getElementById('syncDot').classList.add('offline');
+  }
+}
+
+// Convert Supabase snake_case to our camelCase format
+function normalizeTask(t) {
+  return {
+    id: t.id,
+    title: t.title,
+    description: t.description,
+    owner: t.owner,
+    priority: t.priority,
+    status: t.status,
+    dueDate: t.due_date,
+    createdBy: t.created_by,
+    createdAt: t.created_at,
+    updatedAt: t.updated_at,
+  };
+}
+
+function startRealtimeListeners() {
+  // Listen to tasks table changes in real-time
+  if (taskChannel) supabase.removeChannel(taskChannel);
+  taskChannel = supabase.channel('tasks-changes')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, () => {
+      loadAllData(); // Reload on any change
+    })
+    .subscribe((status) => {
+      if (status === 'SUBSCRIBED') {
+        document.getElementById('syncDot').classList.remove('offline');
+      }
+    });
+
+  // Listen to users table for new registrations
+  if (userChannel) supabase.removeChannel(userChannel);
+  userChannel = supabase.channel('users-changes')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'users' }, () => {
+      loadAllData();
+    })
+    .subscribe();
+}
+
+function stopListeners() {
+  if (taskChannel) { supabase.removeChannel(taskChannel); taskChannel = null; }
+  if (userChannel) { supabase.removeChannel(userChannel); userChannel = null; }
 }
 
 // ═══════════════════════════════════════
 // REGISTRATION
 // ═══════════════════════════════════════
 
-// Live password validation
 document.getElementById('regPassword').addEventListener('input', validatePasswordLive);
 document.getElementById('regConfirm').addEventListener('input', validatePasswordLive);
 
 function validatePasswordLive() {
   const pw = document.getElementById('regPassword').value;
   const cf = document.getElementById('regConfirm').value;
-
   const lenOk = pw.length >= 6;
   const matchOk = pw.length > 0 && cf.length > 0 && pw === cf;
-
   const ruleLen = document.getElementById('ruleLen');
   const ruleMatch = document.getElementById('ruleMatch');
-
   ruleLen.className = lenOk ? 'rule pass' : 'rule fail';
   ruleLen.innerHTML = (lenOk ? '&#x2713;' : '&#x2022;') + ' At least 6 characters';
-
   ruleMatch.className = matchOk ? 'rule pass' : 'rule fail';
   ruleMatch.innerHTML = (matchOk ? '&#x2713;' : '&#x2022;') + ' Passwords match';
 }
 
-function handleRegister() {
+async function handleRegister() {
   const fullName = document.getElementById('regFullName').value.trim();
   const username = document.getElementById('regUsername').value.trim().toLowerCase();
   const password = document.getElementById('regPassword').value;
   const confirm = document.getElementById('regConfirm').value;
   const msgEl = document.getElementById('regMsg');
+  const btn = document.getElementById('btnRegister');
 
-  // Validation
-  if (!fullName) {
+  if (!fullName) { msgEl.className='msg error'; msgEl.textContent='Please enter your full name'; return; }
+  if (!username || username.length < 3) { msgEl.className='msg error'; msgEl.textContent='Username must be at least 3 characters'; return; }
+  if (/[^a-z0-9._]/.test(username)) { msgEl.className='msg error'; msgEl.textContent='Username can only contain letters, numbers, dots, underscores'; return; }
+  if (password.length < 6) { msgEl.className='msg error'; msgEl.textContent='Password must be at least 6 characters'; return; }
+  if (password !== confirm) { msgEl.className='msg error'; msgEl.textContent='Passwords do not match'; return; }
+
+  btn.disabled = true;
+  btn.textContent = 'Creating...';
+
+  try {
+    // Check if username exists
+    const { data: existing } = await supabase.from('users').select('id').eq('username', username);
+    if (existing && existing.length > 0) {
+      msgEl.className = 'msg error';
+      msgEl.textContent = 'Username already taken. Try another one.';
+      btn.disabled = false;
+      btn.textContent = 'Create Account';
+      return;
+    }
+
+    // Check if first user (becomes Admin)
+    const { count } = await supabase.from('users').select('*', { count: 'exact', head: true });
+    const role = (count || 0) === 0 ? 'Admin' : 'Member';
+
+    const { error } = await supabase.from('users').insert({
+      username,
+      name: fullName,
+      password,
+      role,
+      registered_at: new Date().toISOString()
+    });
+
+    if (error) throw error;
+
+    msgEl.className = 'msg success';
+    msgEl.textContent = 'Account created! Redirecting to sign in...';
+
+    setTimeout(() => {
+      showLogin();
+      document.getElementById('loginUser').value = username;
+      document.getElementById('loginUser').focus();
+    }, 1200);
+  } catch(e) {
     msgEl.className = 'msg error';
-    msgEl.textContent = 'Please enter your full name';
-    return;
-  }
-  if (!username || username.length < 3) {
-    msgEl.className = 'msg error';
-    msgEl.textContent = 'Username must be at least 3 characters';
-    return;
-  }
-  if (/[^a-z0-9._]/.test(username)) {
-    msgEl.className = 'msg error';
-    msgEl.textContent = 'Username can only contain letters, numbers, dots, underscores';
-    return;
-  }
-  if (password.length < 6) {
-    msgEl.className = 'msg error';
-    msgEl.textContent = 'Password must be at least 6 characters';
-    return;
-  }
-  if (password !== confirm) {
-    msgEl.className = 'msg error';
-    msgEl.textContent = 'Passwords do not match';
-    return;
+    msgEl.textContent = 'Network error. Please try again.';
+    console.error(e);
   }
 
-  const users = getUsers();
-  if (users.find(u => u.username === username)) {
-    msgEl.className = 'msg error';
-    msgEl.textContent = 'Username already taken. Try another one.';
-    return;
-  }
-
-  // Register
-  const newUser = {
-    id: 'U' + Date.now(),
-    username,
-    name: fullName,
-    password,               // In a real app, hash this server-side
-    role: users.length === 0 ? 'Admin' : 'Member',  // First user becomes Admin
-    registeredAt: new Date().toISOString()
-  };
-
-  users.push(newUser);
-  saveUsers(users);
-
-  msgEl.className = 'msg success';
-  msgEl.textContent = 'Account created! Redirecting to sign in...';
-
-  setTimeout(() => {
-    showLogin();
-    document.getElementById('loginUser').value = username;
-    document.getElementById('loginUser').focus();
-  }, 1200);
+  btn.disabled = false;
+  btn.textContent = 'Create Account';
 }
 
-// Enter key handling on registration form
 document.getElementById('regFullName').addEventListener('keydown', e => { if(e.key==='Enter') document.getElementById('regUsername').focus(); });
 document.getElementById('regUsername').addEventListener('keydown', e => { if(e.key==='Enter') document.getElementById('regPassword').focus(); });
 document.getElementById('regPassword').addEventListener('keydown', e => { if(e.key==='Enter') document.getElementById('regConfirm').focus(); });
@@ -503,80 +581,98 @@ document.getElementById('regConfirm').addEventListener('keydown', e => { if(e.ke
 // LOGIN
 // ═══════════════════════════════════════
 
-function handleLogin() {
+async function handleLogin() {
   const u = document.getElementById('loginUser').value.trim().toLowerCase();
   const p = document.getElementById('loginPass').value;
   const msgEl = document.getElementById('loginError');
+  const btn = document.getElementById('btnLogin');
 
-  if (!u || !p) {
-    msgEl.textContent = 'Please enter username and password';
-    return;
+  if (!u || !p) { msgEl.textContent = 'Please enter username and password'; return; }
+
+  btn.disabled = true;
+  btn.textContent = 'Signing in...';
+
+  try {
+    const { data, error } = await supabase.from('users').select('*').eq('username', u).single();
+    if (error || !data) {
+      msgEl.textContent = 'Invalid username or password';
+      document.getElementById('loginPass').value = '';
+    } else if (data.password === p) {
+      currentUser = { id: data.id, username: data.username, name: data.name, role: data.role };
+      localStorage.setItem('tatvapulse_session', JSON.stringify(currentUser));
+      showApp();
+    } else {
+      msgEl.textContent = 'Invalid username or password';
+      document.getElementById('loginPass').value = '';
+    }
+  } catch(e) {
+    msgEl.textContent = 'Network error. Please try again.';
+    console.error(e);
   }
 
-  const users = getUsers();
-  const found = users.find(usr => usr.username === u && usr.password === p);
-
-  if (found) {
-    currentUser = { username: found.username, name: found.name, role: found.role, id: found.id };
-    localStorage.setItem('tatvapulse_session', JSON.stringify(currentUser));
-    showApp();
-  } else {
-    msgEl.textContent = 'Invalid username or password';
-    document.getElementById('loginPass').value = '';
-  }
+  btn.disabled = false;
+  btn.textContent = 'Sign In';
 }
 
 document.getElementById('loginPass').addEventListener('keydown', e => { if(e.key==='Enter') handleLogin(); });
 document.getElementById('loginUser').addEventListener('keydown', e => { if(e.key==='Enter') document.getElementById('loginPass').focus(); });
 
 function handleLogout() {
+  stopListeners();
   currentUser = null;
+  allUsers = [];
+  allTasks = [];
   localStorage.removeItem('tatvapulse_session');
   showLogin();
 }
 
 // ═══════════════════════════════════════
-// AUTO-SESSION CHECK ON LOAD
+// INIT — CHECK SESSION ON LOAD
 // ═══════════════════════════════════════
 
-(function init() {
+(async function init() {
   const session = localStorage.getItem('tatvapulse_session');
-  const users = getUsers();
-
   if (session) {
-    const s = JSON.parse(session);
-    // Verify user still exists
-    if (users.find(u => u.username === s.username)) {
-      currentUser = s;
-      showApp();
-      return;
+    try {
+      const s = JSON.parse(session);
+      // Verify user still exists in Supabase
+      const { data } = await supabase.from('users').select('id').eq('username', s.username).single();
+      if (data) {
+        currentUser = s;
+        showApp();
+        return;
+      }
+    } catch(e) {
+      console.error('Session check failed:', e);
     }
     localStorage.removeItem('tatvapulse_session');
   }
 
-  // No session: show register if no users yet, otherwise show login
-  if (users.length === 0) {
-    showRegister();
-  } else {
+  // No valid session — check if any users exist
+  try {
+    const { count } = await supabase.from('users').select('*', { count: 'exact', head: true });
+    if ((count || 0) === 0) {
+      showRegister();
+    } else {
+      showLogin();
+    }
+  } catch(e) {
     showLogin();
   }
 })();
 
 // ═══════════════════════════════════════
-// OWNER DROPDOWNS (from registered users)
+// OWNER DROPDOWNS (from Supabase users)
 // ═══════════════════════════════════════
 
 function populateOwnerDropdowns() {
-  const users = getUsers();
-  const names = users.map(u => u.name);
-
-  // Task form owner select
+  const names = allUsers.map(u => u.name);
   const sel = document.getElementById('taskOwner');
   sel.innerHTML = names.map(n => `<option value="${n}">${n}</option>`).join('');
-
-  // Filter owner select
   const filt = document.getElementById('filterOwner');
+  const current = filt.value;
   filt.innerHTML = '<option value="all">All Owners</option>' + names.map(n => `<option value="${n}">${n}</option>`).join('');
+  filt.value = current;
 }
 
 // ═══════════════════════════════════════
@@ -584,7 +680,7 @@ function populateOwnerDropdowns() {
 // ═══════════════════════════════════════
 
 function renderTasks() {
-  let tasks = getTasks();
+  let tasks = [...allTasks];
   const fs = document.getElementById('filterStatus').value;
   const fo = document.getElementById('filterOwner').value;
   const fp = document.getElementById('filterPriority').value;
@@ -605,15 +701,15 @@ function renderTasks() {
     tbody.innerHTML = tasks.map(t => {
       const prioClass = t.priority.toLowerCase();
       const statusClass = t.status.toLowerCase().replace(' ','-');
-      const initials = t.owner.split(' ').map(w=>w[0]).join('').substring(0,2);
+      const initials = t.owner ? t.owner.split(' ').map(w=>w[0]).join('').substring(0,2) : '??';
       const due = t.dueDate ? new Date(t.dueDate).toLocaleDateString('en-IN', {day:'numeric',month:'short'}) : '—';
-      const created = new Date(t.createdAt).toLocaleDateString('en-IN', {day:'numeric',month:'short'});
+      const created = t.createdAt ? new Date(t.createdAt).toLocaleDateString('en-IN', {day:'numeric',month:'short'}) : '—';
       return `<tr>
         <td>
           <div style="font-weight:600;margin-bottom:2px">${esc(t.title)}</div>
           ${t.description ? `<div style="font-size:12px;color:var(--text-muted);max-width:300px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(t.description)}</div>` : ''}
         </td>
-        <td><span class="owner-chip"><span class="mini-avatar">${initials}</span>${esc(t.owner)}</span></td>
+        <td><span class="owner-chip"><span class="mini-avatar">${initials}</span>${esc(t.owner||'')}</span></td>
         <td><span class="priority-badge ${prioClass}">${t.priority}</span></td>
         <td><span class="status-badge ${statusClass}">${t.status}</span></td>
         <td>${due}</td>
@@ -632,24 +728,23 @@ function renderTasks() {
 }
 
 function updateStats() {
-  const tasks = getTasks();
-  document.getElementById('statTotal').textContent = tasks.length;
-  document.getElementById('statOpen').textContent = tasks.filter(t=>t.status==='Open').length;
-  document.getElementById('statProgress').textContent = tasks.filter(t=>t.status==='In Progress').length;
-  document.getElementById('statDone').textContent = tasks.filter(t=>t.status==='Done').length;
+  document.getElementById('statTotal').textContent = allTasks.length;
+  document.getElementById('statOpen').textContent = allTasks.filter(t=>t.status==='Open').length;
+  document.getElementById('statProgress').textContent = allTasks.filter(t=>t.status==='In Progress').length;
+  document.getElementById('statDone').textContent = allTasks.filter(t=>t.status==='Done').length;
 }
 
 function esc(s) { const d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
 
 // ═══════════════════════════════════════
-// TASK CRUD
+// TASK CRUD (Firestore)
 // ═══════════════════════════════════════
 
 function openModal(taskId) {
   editingTaskId = taskId || null;
   document.getElementById('modalTitle').textContent = taskId ? 'Edit Task' : 'New Task';
   if (taskId) {
-    const t = getTasks().find(t=>t.id===taskId);
+    const t = allTasks.find(t=>t.id===taskId);
     if(t) {
       document.getElementById('taskTitle').value = t.title;
       document.getElementById('taskDesc').value = t.description||'';
@@ -674,46 +769,51 @@ function closeModal() {
   editingTaskId = null;
 }
 
-function saveTask() {
+async function saveTask() {
   const title = document.getElementById('taskTitle').value.trim();
   const owner = document.getElementById('taskOwner').value;
   if (!title) { alert('Please enter a task title'); return; }
 
-  const tasks = getTasks();
   const taskData = {
     title,
     description: document.getElementById('taskDesc').value.trim(),
     owner,
     priority: document.getElementById('taskPriority').value,
     status: document.getElementById('taskStatus').value,
-    dueDate: document.getElementById('taskDue').value,
+    due_date: document.getElementById('taskDue').value || null,
+    updated_at: new Date().toISOString(),
   };
 
-  if (editingTaskId) {
-    const idx = tasks.findIndex(t=>t.id===editingTaskId);
-    if (idx>=0) { tasks[idx] = { ...tasks[idx], ...taskData, updatedAt: new Date().toISOString() }; }
-  } else {
-    tasks.push({
-      id: 'T' + Date.now(),
-      ...taskData,
-      createdBy: currentUser.name,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    });
+  try {
+    if (editingTaskId) {
+      const { error } = await supabase.from('tasks').update(taskData).eq('id', editingTaskId);
+      if (error) throw error;
+    } else {
+      taskData.created_by = currentUser.name;
+      taskData.created_at = new Date().toISOString();
+      const { error } = await supabase.from('tasks').insert(taskData);
+      if (error) throw error;
+    }
+    closeModal();
+    await loadAllData();
+  } catch(e) {
+    alert('Failed to save. Please try again.');
+    console.error(e);
   }
-
-  saveTasks(tasks);
-  closeModal();
-  renderTasks();
 }
 
 function editTask(id) { openModal(id); }
 
-function deleteTask(id) {
+async function deleteTask(id) {
   if (!confirm('Delete this task?')) return;
-  const tasks = getTasks().filter(t=>t.id!==id);
-  saveTasks(tasks);
-  renderTasks();
+  try {
+    const { error } = await supabase.from('tasks').delete().eq('id', id);
+    if (error) throw error;
+    await loadAllData();
+  } catch(e) {
+    alert('Failed to delete. Please try again.');
+    console.error(e);
+  }
 }
 
 // ═══════════════════════════════════════
@@ -737,7 +837,7 @@ function updateWAPreview() {
 }
 
 function generateSnapshot() {
-  let tasks = getTasks();
+  let tasks = [...allTasks];
   const filter = document.getElementById('waFilter').value;
 
   if (filter === 'mine') tasks = tasks.filter(t => t.owner === currentUser.name);
@@ -763,7 +863,6 @@ function generateSnapshot() {
       if (!grouped[t.status]) grouped[t.status] = [];
       grouped[t.status].push(t);
     });
-
     for (const status of ['Blocked','In Progress','Open','Done']) {
       if (!grouped[status]) continue;
       msg += `${statusIcon[status]} *${status.toUpperCase()}* (${grouped[status].length})\n`;
@@ -776,9 +875,8 @@ function generateSnapshot() {
     }
   }
 
-  const total = getTasks();
   msg += `━━━━━━━━━━━━━━━━━━━━\n`;
-  msg += `📈 *Summary:* ${total.length} total | ${total.filter(t=>t.status==='Open').length} open | ${total.filter(t=>t.status==='In Progress').length} in progress | ${total.filter(t=>t.status==='Done').length} done | ${total.filter(t=>t.status==='Blocked').length} blocked\n`;
+  msg += `📈 *Summary:* ${allTasks.length} total | ${allTasks.filter(t=>t.status==='Open').length} open | ${allTasks.filter(t=>t.status==='In Progress').length} in progress | ${allTasks.filter(t=>t.status==='Done').length} done | ${allTasks.filter(t=>t.status==='Blocked').length} blocked\n`;
   msg += `━━━━━━━━━━━━━━━━━━━━\n`;
   msg += `Sent from TatvaPulse`;
 
@@ -810,27 +908,21 @@ function sendWhatsApp() {
 // ═══════════════════════════════════════
 
 function exportToExcel() {
-  let tasks = getTasks();
+  let tasks = [...allTasks];
   const fs = document.getElementById('filterStatus').value;
   const fo = document.getElementById('filterOwner').value;
   const fp = document.getElementById('filterPriority').value;
 
-  // Apply same filters as current view
   if (fs !== 'all') tasks = tasks.filter(t => t.status === fs);
   if (fo !== 'all') tasks = tasks.filter(t => t.owner === fo);
   if (fp !== 'all') tasks = tasks.filter(t => t.priority === fp);
 
-  if (tasks.length === 0) {
-    alert('No tasks to export. Add some tasks first!');
-    return;
-  }
+  if (tasks.length === 0) { alert('No tasks to export.'); return; }
 
-  // Sort same as table
   const statusOrder = { 'Blocked':0, 'In Progress':1, 'Open':2, 'Done':3 };
   const prioOrder = { 'High':0, 'Medium':1, 'Low':2 };
   tasks.sort((a,b) => (statusOrder[a.status]??9) - (statusOrder[b.status]??9) || (prioOrder[a.priority]??9) - (prioOrder[b.priority]??9));
 
-  // Build rows
   const rows = tasks.map((t, i) => ({
     '#': i + 1,
     'Task Title': t.title,
@@ -840,30 +932,14 @@ function exportToExcel() {
     'Status': t.status,
     'Due Date': t.dueDate ? new Date(t.dueDate).toLocaleDateString('en-IN', {day:'numeric', month:'short', year:'numeric'}) : '',
     'Created By': t.createdBy || '',
-    'Created On': new Date(t.createdAt).toLocaleDateString('en-IN', {day:'numeric', month:'short', year:'numeric'}),
+    'Created On': t.createdAt ? new Date(t.createdAt).toLocaleDateString('en-IN', {day:'numeric', month:'short', year:'numeric'}) : '',
   }));
 
-  // Create workbook
   const wb = XLSX.utils.book_new();
   const ws = XLSX.utils.json_to_sheet(rows);
-
-  // Set column widths
-  ws['!cols'] = [
-    { wch: 4 },   // #
-    { wch: 35 },  // Title
-    { wch: 40 },  // Description
-    { wch: 20 },  // Owner
-    { wch: 10 },  // Priority
-    { wch: 14 },  // Status
-    { wch: 16 },  // Due Date
-    { wch: 20 },  // Created By
-    { wch: 16 },  // Created On
-  ];
-
+  ws['!cols'] = [{wch:4},{wch:35},{wch:40},{wch:20},{wch:10},{wch:14},{wch:16},{wch:20},{wch:16}];
   XLSX.utils.book_append_sheet(wb, ws, 'Action Items');
 
-  // Add summary sheet
-  const allTasks = getTasks();
   const summaryRows = [
     { 'Metric': 'Total Tasks', 'Count': allTasks.length },
     { 'Metric': 'Open', 'Count': allTasks.filter(t=>t.status==='Open').length },
@@ -871,28 +947,23 @@ function exportToExcel() {
     { 'Metric': 'Done', 'Count': allTasks.filter(t=>t.status==='Done').length },
     { 'Metric': 'Blocked', 'Count': allTasks.filter(t=>t.status==='Blocked').length },
     { 'Metric': '', 'Count': '' },
-    { 'Metric': 'High Priority', 'Count': allTasks.filter(t=>t.priority==='High').length },
-    { 'Metric': 'Medium Priority', 'Count': allTasks.filter(t=>t.priority==='Medium').length },
-    { 'Metric': 'Low Priority', 'Count': allTasks.filter(t=>t.priority==='Low').length },
-    { 'Metric': '', 'Count': '' },
     { 'Metric': 'Exported By', 'Count': currentUser.name },
     { 'Metric': 'Export Date', 'Count': new Date().toLocaleDateString('en-IN', {day:'numeric', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit'}) },
   ];
-
   const ws2 = XLSX.utils.json_to_sheet(summaryRows);
-  ws2['!cols'] = [{ wch: 20 }, { wch: 30 }];
+  ws2['!cols'] = [{wch:20},{wch:30}];
   XLSX.utils.book_append_sheet(wb, ws2, 'Summary');
 
-  // Download
-  const dateStr = new Date().toISOString().slice(0,10);
-  XLSX.writeFile(wb, `TatvaPulse_ActionItems_${dateStr}.xlsx`);
+  XLSX.writeFile(wb, `TatvaPulse_ActionItems_${new Date().toISOString().slice(0,10)}.xlsx`);
 }
 
-// Close modals on overlay click
+// ═══════════════════════════════════════
+// MODAL & KEYBOARD
+// ═══════════════════════════════════════
+
 document.getElementById('taskModal').addEventListener('click', e => { if(e.target===e.currentTarget) closeModal(); });
 document.getElementById('waModal').addEventListener('click', e => { if(e.target===e.currentTarget) closeWAModal(); });
 
-// Keyboard shortcuts
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') { closeModal(); closeWAModal(); }
   if (e.key === 'n' && !e.ctrlKey && !e.metaKey && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA' && document.activeElement.tagName !== 'SELECT') {
