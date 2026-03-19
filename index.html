@@ -79,6 +79,8 @@
   .btn-new:hover { transform:translateY(-1px); box-shadow:0 6px 20px rgba(108,92,231,.3); }
   .btn-whatsapp { padding:12px 24px; border:none; border-radius:10px; background:#25D366; color:#fff; font-size:14px; font-weight:700; cursor:pointer; transition:.2s; display:flex; align-items:center; gap:8px; }
   .btn-whatsapp:hover { background:#1DA851; transform:translateY(-1px); }
+  .btn-excel { padding:12px 24px; border:none; border-radius:10px; background:#217346; color:#fff; font-size:14px; font-weight:700; cursor:pointer; transition:.2s; display:flex; align-items:center; gap:8px; }
+  .btn-excel:hover { background:#1A5C38; transform:translateY(-1px); }
   .filter-group { display:flex; align-items:center; gap:8px; margin-left:auto; }
   .filter-group select { padding:10px 14px; border:1px solid var(--border); border-radius:8px; background:var(--bg-input); color:var(--text); font-size:13px; outline:none; }
   .filter-group select:focus { border-color:var(--primary); }
@@ -210,6 +212,10 @@
       <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347zM12.05 21.785h-.01a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.981.998-3.648-.235-.374A9.86 9.86 0 012.15 12.009c.002-5.45 4.437-9.884 9.889-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884zm0-21.67C5.495.116.112 5.497.11 12.01a11.81 11.81 0 001.587 5.926L0 24l6.233-1.635a11.85 11.85 0 005.81 1.523h.005c6.554 0 11.89-5.335 11.893-11.893A11.82 11.82 0 0020.525 3.49 11.81 11.81 0 0012.05.115z"/></svg>
       Share on WhatsApp
     </button>
+    <button class="btn-excel" onclick="exportToExcel()">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+      Export Excel
+    </button>
     <div class="filter-group">
       <select id="filterStatus" onchange="renderTasks()">
         <option value="all">All Status</option>
@@ -322,6 +328,7 @@
   </div>
 </div>
 
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
 <script>
 // ═══════════════════════════════════════
 // DATA HELPERS
@@ -796,6 +803,89 @@ function copySnapshot() {
 function sendWhatsApp() {
   const text = encodeURIComponent(generateSnapshot());
   window.open(`https://wa.me/?text=${text}`, '_blank');
+}
+
+// ═══════════════════════════════════════
+// EXCEL EXPORT
+// ═══════════════════════════════════════
+
+function exportToExcel() {
+  let tasks = getTasks();
+  const fs = document.getElementById('filterStatus').value;
+  const fo = document.getElementById('filterOwner').value;
+  const fp = document.getElementById('filterPriority').value;
+
+  // Apply same filters as current view
+  if (fs !== 'all') tasks = tasks.filter(t => t.status === fs);
+  if (fo !== 'all') tasks = tasks.filter(t => t.owner === fo);
+  if (fp !== 'all') tasks = tasks.filter(t => t.priority === fp);
+
+  if (tasks.length === 0) {
+    alert('No tasks to export. Add some tasks first!');
+    return;
+  }
+
+  // Sort same as table
+  const statusOrder = { 'Blocked':0, 'In Progress':1, 'Open':2, 'Done':3 };
+  const prioOrder = { 'High':0, 'Medium':1, 'Low':2 };
+  tasks.sort((a,b) => (statusOrder[a.status]??9) - (statusOrder[b.status]??9) || (prioOrder[a.priority]??9) - (prioOrder[b.priority]??9));
+
+  // Build rows
+  const rows = tasks.map((t, i) => ({
+    '#': i + 1,
+    'Task Title': t.title,
+    'Description': t.description || '',
+    'Owner': t.owner,
+    'Priority': t.priority,
+    'Status': t.status,
+    'Due Date': t.dueDate ? new Date(t.dueDate).toLocaleDateString('en-IN', {day:'numeric', month:'short', year:'numeric'}) : '',
+    'Created By': t.createdBy || '',
+    'Created On': new Date(t.createdAt).toLocaleDateString('en-IN', {day:'numeric', month:'short', year:'numeric'}),
+  }));
+
+  // Create workbook
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.json_to_sheet(rows);
+
+  // Set column widths
+  ws['!cols'] = [
+    { wch: 4 },   // #
+    { wch: 35 },  // Title
+    { wch: 40 },  // Description
+    { wch: 20 },  // Owner
+    { wch: 10 },  // Priority
+    { wch: 14 },  // Status
+    { wch: 16 },  // Due Date
+    { wch: 20 },  // Created By
+    { wch: 16 },  // Created On
+  ];
+
+  XLSX.utils.book_append_sheet(wb, ws, 'Action Items');
+
+  // Add summary sheet
+  const allTasks = getTasks();
+  const summaryRows = [
+    { 'Metric': 'Total Tasks', 'Count': allTasks.length },
+    { 'Metric': 'Open', 'Count': allTasks.filter(t=>t.status==='Open').length },
+    { 'Metric': 'In Progress', 'Count': allTasks.filter(t=>t.status==='In Progress').length },
+    { 'Metric': 'Done', 'Count': allTasks.filter(t=>t.status==='Done').length },
+    { 'Metric': 'Blocked', 'Count': allTasks.filter(t=>t.status==='Blocked').length },
+    { 'Metric': '', 'Count': '' },
+    { 'Metric': 'High Priority', 'Count': allTasks.filter(t=>t.priority==='High').length },
+    { 'Metric': 'Medium Priority', 'Count': allTasks.filter(t=>t.priority==='Medium').length },
+    { 'Metric': 'Low Priority', 'Count': allTasks.filter(t=>t.priority==='Low').length },
+    { 'Metric': '', 'Count': '' },
+    { 'Metric': 'Exported By', 'Count': currentUser.name },
+    { 'Metric': 'Export Date', 'Count': new Date().toLocaleDateString('en-IN', {day:'numeric', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit'}) },
+  ];
+
+  const ws2 = XLSX.utils.json_to_sheet(summaryRows);
+  ws2['!cols'] = [{ wch: 20 }, { wch: 30 }];
+  XLSX.utils.book_append_sheet(wb, ws2, 'Summary');
+
+  // Download
+  const dateStr = new Date().toISOString().slice(0,10);
+  XLSX.writeFile(wb, `TatvaPulse_ActionItems_${dateStr}.xlsx`);
 }
 
 // Close modals on overlay click
