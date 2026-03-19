@@ -357,7 +357,20 @@
 const SUPABASE_URL = 'https://pqjoespbqhgncszkdmta.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBxam9lc3BicWhnbmNzemtkbXRhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM5MTI1NTIsImV4cCI6MjA4OTQ4ODU1Mn0.PO7mbDcVb9pw3hX2xi5HXzl9hOKmFQS08zG20gqM-CE';
 
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+// Safety net — if page spins for more than 10 seconds, force show login
+setTimeout(() => {
+  const ls = document.getElementById('loadingScreen');
+  if (ls && ls.style.display !== 'none') {
+    console.warn('Timeout: forcing login screen');
+    showLogin();
+  }
+}, 10000);
+
+if (!window.supabase) {
+  console.error('Supabase library failed to load');
+  setTimeout(() => showLogin(), 500);
+}
+const supabase = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
 
 // ═══════════════════════════════════════
 // STATE
